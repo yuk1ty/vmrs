@@ -1,0 +1,10 @@
+[package]
+name = "vmrs"
+version = "0.1.0"
+authors = ["Yuki Toyoda <toyoda_yuki@cyberagent.co.jp>"]
+
+[dependencies]
+termios = "0.3"
+enum_primitive = "0.1.1"
+libc = "0.2"
+nix = "0.12"
