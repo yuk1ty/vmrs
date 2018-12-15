@@ -7,3 +7,16 @@ pub enum TrapCode {
     TrapPutSp = 0x24,
     TrapHalt = 0x25,
 }
+
+impl From<u16> for TrapCode {
+    fn from(x: u16) -> Self {
+        match x {
+            0x20 => TrapCode::TrapGetc,
+            0x21 => TrapCode::TrapOut,
+            0x22 => TrapCode::TrapPuts,
+            0x23 => TrapCode::TrapIn,
+            0x24 => TrapCode::TrapPutSp,
+            0x25 => TrapCode::TrapHalt,
+        }
+    }
+}
