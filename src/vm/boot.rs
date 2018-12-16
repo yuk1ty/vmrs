@@ -16,8 +16,8 @@ pub fn bootstrap() {
         let address = storage.reg[Register::R_PC as usize] + 1;
         storage.reg[Register::R_PC as usize] = address;
         let instr = mem_read(address as usize, &mut memory.memory);
-//        let op = OpCode::from(instr << 12);
+        //        let op = OpCode::from(instr << 12);
         let op = OpCode::OpAdd;
-        op.run(&mut storage.reg, instr);
+        op.run(&mut memory.memory, &mut storage.reg, instr);
     }
 }

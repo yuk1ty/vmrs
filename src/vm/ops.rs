@@ -1,5 +1,7 @@
-use vm::registers::Register::*;
 use vm::flags::ConditionFlag::*;
+use vm::memory_mapped_registers::*;
+use vm::registers::Register::*;
+use vm::traps::TrapCode;
 
 #[derive(Debug, PartialEq)]
 pub enum OpCode {
@@ -17,31 +19,140 @@ pub enum OpCode {
     OpSti,  // store indirect
     OpJmp,  // jump
     OpRes,  // reserved
-    OpLea,  // load effective address
+    OpLea,  // load effective addreiss
     OpTrap, // execute trap
 }
 
 impl OpCode {
-    pub fn run(&self, reg: &mut [u16; R_COUNT as usize]) {
+    pub fn run(&self, memory: &mut [u16; 65536], reg: &mut [u16; R_COUNT as usize], instr: u16) {
         match self {
             OpCode::OpAdd => {
-                let ret_instr: u16 = 0;
                 // destination register
-                let r0 = (ret_instr >> 9) & 0x7;
+                let r0 = (instr >> 9) & 0x7;
                 // first operand
-                let r1 = (ret_instr >> 6) & 0x7;
+                let r1 = (instr >> 6) & 0x7;
                 // whether we are in immediate mode
-                let imm_flag = (ret_instr >> 5) & 0x1 == 1;
+                let imm_flag = (instr >> 5) & 0x1 == 1;
 
                 if imm_flag {
-                    let imm5: u16 = sign_extend(ret_instr & 0x1F, 5);
+                    let imm5: u16 = sign_extend(instr & 0x1F, 5);
                     reg[r0 as usize] = reg[r1 as usize] + imm5;
                 } else {
-                    let r2 = ret_instr & 0x7;
+                    let r2 = instr & 0x7;
                     reg[r0 as usize] = reg[r1 as usize] + reg[r2 as usize];
                 }
 
                 update_flags(r0, reg);
+            }
+            OpCode::OpAnd => {
+                let r0 = (instr >> 9) & 0x7;
+                let r1 = (instr >> 6) & 0x7;
+                let imm_flag = (instr >> 5) & 0x1 == 1;
+
+                if imm_flag {
+                    let imm5: u16 = sign_extend(instr & 0x1F, 5);
+                    reg[r0 as usize] = reg[r1 as usize] & imm5;
+                } else {
+                    let r2 = instr & 0x7;
+                    reg[r0 as usize] = reg[r1 as usize] & reg[r2 as usize];
+                }
+
+                update_flags(r0, reg);
+            }
+            OpCode::OpNot => {
+                let r0 = (instr >> 9) & 0x7;
+                let r1 = (instr >> 6) & 0x7;
+                reg[r0 as usize] = !reg[r1 as usize];
+
+                update_flags(r0, reg);
+            }
+            OpCode::OpBr => {
+                let pc_offset = sign_extend(instr & 0x1ff, 9);
+                let cond_flag = (instr >> 9) & 0x7;
+                if cond_flag & reg[R_COND as usize] == 1 {
+                    reg[R_PC as usize] = reg[R_PC as usize] + pc_offset;
+                }
+            }
+            OpCode::OpJmp => {
+                let r1 = (instr >> 6) & 0x7;
+                reg[R_PC as usize] = reg[r1 as usize];
+            }
+            OpCode::OpJsr => {
+                let r1 = (instr >> 6) & 0x7;
+                let mut long_pc_offset = sign_extend(instr & 0x7ff, 11);
+                let long_flag = (instr >> 11) & 1 == 1;
+
+                reg[R_R7 as usize] = reg[R_PC as usize];
+                if long_flag {
+                    long_pc_offset = long_pc_offset + 1;
+                    reg[R_PC as usize] = long_pc_offset;
+                } else {
+                    reg[R_PC as usize] = reg[r1 as usize];
+                }
+            }
+            OpCode::OpLd => {
+                let r0 = (instr >> 9) & 0x7;
+                let pc_offset = sign_extend(instr & 0x1ff, 9);
+                reg[r0 as usize] = mem_read((reg[R_PC as usize] + pc_offset) as usize, memory);
+            }
+            OpCode::OpLdr => {
+                let r0 = (instr >> 9) & 0x7;
+                let r1 = (instr >> 6) & 0x7;
+                let offset = sign_extend(instr & 0x3F, 6);
+                reg[r0 as usize] = mem_read((reg[r1 as usize] + offset) as usize, memory);
+                update_flags(r0, reg);
+            }
+            OpCode::OpLea => {
+                let r0 = (instr >> 9) & 0x7;
+                let pc_offset = sign_extend(instr & 0x1ff, 9);
+                mem_write(
+                    mem_read((reg[R_PC as usize] + pc_offset) as usize, memory) as usize,
+                    reg[r0 as usize],
+                    memory,
+                );
+            }
+            OpCode::OpSt => {
+                let r0 = (instr >> 9) & 0x7;
+                let pc_offset = sign_extend(instr & 0x1ff, 9);
+                mem_write(
+                    mem_read((reg[R_PC as usize] + pc_offset) as usize, memory) as usize,
+                    reg[r0 as usize],
+                    memory,
+                );
+            }
+            OpCode::OpSti => {
+                let r0 = (instr >> 9) & 0x7;
+                let r1 = (instr >> 6) & 0x7;
+                let offset = sign_extend(instr & 0x3F, 6);
+                mem_write(
+                    (reg[r1 as usize] + offset) as usize,
+                    reg[r0 as usize],
+                    memory,
+                );
+            }
+            OpCode::OpStr => {
+                let r0 = (instr >> 9) & 0x7;
+                let r1 = (instr >> 6) & 0x7;
+                let offset = sign_extend(instr & 0x3F, 6);
+                mem_write(
+                    (reg[r1 as usize] + offset) as usize,
+                    reg[r0 as usize],
+                    memory,
+                );
+            }
+            OpCode::OpTrap => {
+                match TrapCode::from(instr & 0xFF) {
+                    TrapCode::TrapGetc => unimplemented!(),
+                    TrapCode::TrapOut => unimplemented!(),
+                    TrapCode::TrapIn => unimplemented!(),
+                    TrapCode::TrapPuts => unimplemented!(),
+                    TrapCode::TrapPutSp => unimplemented!(),
+                    TrapCode::TrapHalt => unimplemented!(),
+                    _ => {
+                        // TODO ここは普通に Ok を返す感じの実装にする必要がありそう
+                        panic!("bad trap code");
+                    }
+                }
             }
             _ => unimplemented!(),
         }

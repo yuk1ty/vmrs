@@ -6,6 +6,7 @@ pub enum TrapCode {
     TrapIn = 0x23,
     TrapPutSp = 0x24,
     TrapHalt = 0x25,
+    TrapEmpty,
 }
 
 impl From<u16> for TrapCode {
@@ -17,6 +18,7 @@ impl From<u16> for TrapCode {
             0x23 => TrapCode::TrapIn,
             0x24 => TrapCode::TrapPutSp,
             0x25 => TrapCode::TrapHalt,
+            _ => TrapCode::TrapEmpty,
         }
     }
 }

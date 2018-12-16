@@ -1,8 +1,8 @@
-use nix::sys::select::FdSet;
+use nix::libc::getchar;
 use nix::sys::select::select;
+use nix::sys::select::FdSet;
 use nix::sys::time::TimeVal;
 use nix::sys::time::TimeValLike;
-use nix::libc::getchar;
 
 #[derive(Debug, PartialEq)]
 pub enum MemoryMappedRegister {
