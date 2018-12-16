@@ -33,7 +33,6 @@ fn check_key() -> bool {
     let mut fd_set = FdSet::new();
     fd_set.insert(0); // STDIN_FILENO = 0 なので？
     let mut timeval = TimeVal::seconds(0);
-    // TODO nfds, writefds, errorfds is wrong??
     select(None, &mut fd_set, None, None, &mut timeval).expect("failed to select!");
     true
 }
